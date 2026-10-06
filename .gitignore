@@ -54,6 +54,7 @@ __pycache__/
 *.pyc
 
 # Editor / OS
+.vs/
 .vscode/
 .idea/
 *.swp
@@ -85,3 +86,4 @@ output.txt
 
 # Isolated nonmatching candidate comparisons
 /build/non_matching/
+/build/

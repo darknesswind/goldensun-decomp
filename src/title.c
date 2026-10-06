@@ -19,18 +19,52 @@ INCLUDE_ASM("asm/title/Func_80f3078.s");
 #include "dma.h"
 #include "task.h"
 extern void *galloc_ewram(int index, unsigned int size);
-extern void Func_80f3078(unsigned int, unsigned int, unsigned int, unsigned int);
+extern void Func_80f3078(unsigned int, void*, void* target, int);
 extern void Func_80f2f10(void);
+
+typedef enum {
+	PALFADE_ALL = 0,
+	PALFADE_BG = 1,
+	PALFADE_OBJ = 2,
+} PalFadeType;
+
+typedef struct {
+	color_t planeB[256];
+	color_t planeG[256];
+	color_t planeR[256];
+} PalettePlanes;
+
+typedef struct {
+	palette_t palBG;
+	palette_t palOBJ;
+} PaletteData;
+
+typedef struct {
+    PalettePlanes palnBG;
+    PalettePlanes palnOBJ;
+} PalettePlanesData;
+
+typedef struct {
+    PaletteData startPal;
+    PalettePlanesData curPlanes; // +400h
+    PalettePlanesData targetPlanes; // +1000h
+	u16 rampDelta[3][512];
+	u16 dmaMirror[1024];
+	u8 mirrorIndex;
+	char rampFrames;
+	u8 rampPos;
+	u8 pad_3003;
+} PaletteFadeState;
 
 void Func_80f377c(void)
 {
-    unsigned char *p;
+    PaletteFadeState *p;
 
-    p = galloc_ewram(0x20, 0x3004);
+    p = (PaletteFadeState*)galloc_ewram(0x20, 0x3004);
     DMA3_CLEAR(p, 0x3004);
-    DMA3_COPY((void *)0x05000000, p, 0x200);
-    DMA3_COPY((void *)0x05000200, p + 0x200, 0x200);
-    Func_80f3078(0x10000, (unsigned int)p, (unsigned int)(p + 0x1000), 0);
+    DMA3_COPY(PALETTE_BG, (void*)&p->startPal.palBG, sizeof(p->startPal.palBG));
+    DMA3_COPY(PALETTE_OBJ, (void*)&p->startPal.palOBJ, sizeof(p->startPal.palOBJ));
+    Func_80f3078(0x10000, &p->startPal, &p->targetPlanes, PALFADE_ALL);
     StartTask(Func_80f2f10, 0xc80);
 }
 
@@ -43,20 +77,22 @@ void Func_80f37ec(void) {
 
 extern unsigned char iwram_3001ed0[];
 
-void Func_80f3804(int arg0, int arg1) {
-    unsigned char *base;
-    base = *(unsigned char **)iwram_3001ed0;
-    if (base != (unsigned char *)0) {
-        Func_80f3078(arg0, base, base + 0x1000, arg1);
+static inline PaletteFadeState* GetPaletteFadeState(void) {
+	return *(PaletteFadeState**)&iwram_3001ed0;
+}
+
+void Func_80f3804(int arg0, PalFadeType arg1) {
+    PaletteFadeState *p = GetPaletteFadeState();
+    if (p != NULL) {
+        Func_80f3078(arg0, &p->startPal, &p->targetPlanes, arg1);
     }
 }
 
 
-void Func_80f3824(unsigned int arg0, unsigned int arg1) {
-    unsigned int r1;
-    r1 = *(unsigned int *)iwram_3001ed0;
-    if (r1 != 0) {
-        Func_80f3078(arg0, r1, r1 + (0x80 << 3), arg1);
+void Func_80f3824(unsigned int arg0, PalFadeType arg1) {
+    PaletteFadeState *p = GetPaletteFadeState();
+    if (p != NULL) {
+        Func_80f3078(arg0, &p->startPal, &p->curPlanes, arg1);
     }
 }
 
@@ -70,26 +106,15 @@ void Func_80f3844(int arg0)
         *p = arg0;
 }
 
-/* Fade work area at *iwram_3001ed0: the two adjacent bytes at 0x3001/0x3002
- * are the fade duration and the elapsed-frame counter. */
-struct TitleFadeWork {
-    unsigned char unk0000[0x3001];
-    unsigned char fadeFrames;   /* 0x3001 */
-    unsigned char fadeElapsed;  /* 0x3002 */
-};
-
 extern void Func_80f2ebc(void *cur, void *target, void *delta, unsigned int frames);
 
 void Func_80f3858(unsigned int frames)
 {
-    struct TitleFadeWork *work = *(struct TitleFadeWork **)iwram_3001ed0;
-
-    if (work != 0) {
-        work->fadeFrames = frames;
-        work->fadeElapsed = 0;
-        Func_80f2ebc((unsigned char *)work + 0x400,
-                     (unsigned char *)work + 0x1000,
-                     (unsigned char *)work + 0x1c00, frames);
+    PaletteFadeState *p = GetPaletteFadeState();
+    if (p != NULL) {
+        p->rampFrames = frames;
+        p->rampPos = 0;
+        Func_80f2ebc(&p->curPlanes, &p->targetPlanes, &p->rampDelta, frames);
     }
 }
 

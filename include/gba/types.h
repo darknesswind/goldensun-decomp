@@ -57,4 +57,16 @@ typedef fx32 matrix_t[4][3];
 #define NULL ( (void *) 0)
 #endif
 
+typedef u16 color_t;
+typedef color_t palette256_t[256];
+typedef color_t palette16x16_t[16][16];
+typedef union {
+    palette256_t palette256;
+    palette16x16_t palette16x16;
+} palette_t;
+
+#define PALETTE_BG *(palette256_t*)0x05000000
+#define PALETTE_OBJ *(palette256_t*)0x05000200
+#define PALETTE_SIZE 0x200
+
 #endif // _GBA_TYPES_H_

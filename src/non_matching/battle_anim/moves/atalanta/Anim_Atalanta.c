@@ -9,8 +9,6 @@
 
 #define REG_BLDCNT (*(volatile u16 *)0x04000050)
 
-#define PALETTE_BG  ((volatile u16 *)0x05000000)
-
 #define OFFSET_CHECK(field, offset) typedef char field##_offset_check[(unsigned int)&((MoveAnimState *)0)->field == offset ? 1 : -1]
 
 #define STATE_BLITMODE(s) ((s)->blitMode)
