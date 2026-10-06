@@ -154,7 +154,6 @@
 | [rpg/item](rpg/item/) | [Func_8078aa0](rpg/item/Func_8078aa0.c) |
 | [rpg/move](rpg/move/) | [HasMove](rpg/move/HasMove.c) |
 | [sound](sound/) | [Debug_SoundTest](sound/Debug_SoundTest.c), [PlaySound](sound/PlaySound.c), [UpdateMusicSettings](sound/UpdateMusicSettings.c) |
-| [title](title/) | [Func_80f3858](title/Func_80f3858.c) |
 | [ui/icon](ui/icon/) | [DecompressStatusIcon](ui/icon/DecompressStatusIcon.c) |
 | [ui/menu](ui/menu/) | [Func_801b36c](ui/menu/Func_801b36c.c), [Func_801c46c](ui/menu/Func_801c46c.c), [Func_801c9c8](ui/menu/Func_801c9c8.c) |
 | [ui/party_menu](ui/party_menu/) | [Func_80a22f4](ui/party_menu/Func_80a22f4.c), [Func_80a65e4](ui/party_menu/Func_80a65e4.c), [Func_80a735c](ui/party_menu/Func_80a735c.c), [Func_80ab1f4](ui/party_menu/Func_80ab1f4.c) |

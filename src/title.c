@@ -70,7 +70,28 @@ void Func_80f3844(int arg0)
         *p = arg0;
 }
 
-INCLUDE_ASM("asm/title/Func_80f3858.s");
+/* Fade work area at *iwram_3001ed0: the two adjacent bytes at 0x3001/0x3002
+ * are the fade duration and the elapsed-frame counter. */
+struct TitleFadeWork {
+    unsigned char unk0000[0x3001];
+    unsigned char fadeFrames;   /* 0x3001 */
+    unsigned char fadeElapsed;  /* 0x3002 */
+};
+
+extern void Func_80f2ebc(void *cur, void *target, void *delta, unsigned int frames);
+
+void Func_80f3858(unsigned int frames)
+{
+    struct TitleFadeWork *work = *(struct TitleFadeWork **)iwram_3001ed0;
+
+    if (work != 0) {
+        work->fadeFrames = frames;
+        work->fadeElapsed = 0;
+        Func_80f2ebc((unsigned char *)work + 0x400,
+                     (unsigned char *)work + 0x1000,
+                     (unsigned char *)work + 0x1c00, frames);
+    }
+}
 
 int Func_80f3898(int arg0) {
     if (arg0 > 0x1f)
