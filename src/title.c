@@ -1,5 +1,6 @@
 /* title.c -- consolidated TU. */
 #include "nonmatching.h"
+#include "dma.h"
 
 INCLUDE_ASM("asm/title/Func_80f2028.s");
 INCLUDE_ASM("asm/title/LoadGS1TitleGFX.s");
@@ -13,48 +14,62 @@ INCLUDE_ASM("asm/title/CamelotLogo.s");
 void Func_80f2eb8(void) {}
 
 INCLUDE_ASM("asm/title/Func_80f2ebc.s");
-INCLUDE_ASM("asm/title/Func_80f2f10.s");
-INCLUDE_ASM("asm/title/Func_80f3078.s");
-
-#include "dma.h"
-#include "task.h"
-extern void *galloc_ewram(int index, unsigned int size);
-extern void Func_80f3078(unsigned int, void*, void* target, int);
-extern void Func_80f2f10(void);
 
 typedef enum {
-	PALFADE_ALL = 0,
-	PALFADE_BG = 1,
-	PALFADE_OBJ = 2,
+    PALFADE_ALL = 0,
+    PALFADE_BG = 1,
+    PALFADE_OBJ = 2,
 } PalFadeType;
 
-typedef struct {
-	color_t planeB[256];
-	color_t planeG[256];
-	color_t planeR[256];
-} PalettePlanes;
-
-typedef struct {
-	palette_t palBG;
-	palette_t palOBJ;
+typedef union {
+    color_t colors[PALETTE_COUNT * 2]; // BGR555 in u16
+    palette_t palettes[2];
+    struct {
+        palette_t palBG;
+        palette_t palOBJ;
+    };
 } PaletteData;
 
+typedef u16 BGR[3]; // aligns(2)
 typedef struct {
-    PalettePlanes palnBG;
-    PalettePlanes palnOBJ;
-} PalettePlanesData;
+    BGR bgr[PALETTE_COUNT];
+} PaletteBGR;
+
+typedef union {
+    BGR colors[PALETTE_COUNT * 2];
+    PaletteBGR palettes[2];
+    struct {
+        PaletteBGR bgrBG;
+        PaletteBGR bgrOBJ;
+    };
+} PaletteBGRData;
 
 typedef struct {
     PaletteData startPal;
-    PalettePlanesData curPlanes; // +400h
-    PalettePlanesData targetPlanes; // +1000h
-	u16 rampDelta[3][512];
-	u16 dmaMirror[1024];
-	u8 mirrorIndex;
-	char rampFrames;
-	u8 rampPos;
-	u8 pad_3003;
+    PaletteBGRData currentBGR; // +400h
+    PaletteBGRData targetBGR; // +1000h
+    PaletteBGRData rampDelta;
+    PaletteData paletteBuf[2];
+    u8 paletteIdx;
+    char rampFrames;
+    u8 rampPos;
+    u8 pad_3003;
 } PaletteFadeState;
+
+extern unsigned char iwram_3001ed0[];
+
+static inline PaletteFadeState* GetPaletteFadeState(void) {
+    return *(PaletteFadeState**)&iwram_3001ed0;
+}
+
+INCLUDE_ASM("asm/title/Func_80f2f10.s");
+extern void Func_80f2f10(void);
+
+INCLUDE_ASM("asm/title/Func_80f3078.s");
+extern void Func_80f3078(unsigned int, void*, void* target, int);
+
+#include "task.h"
+extern void *galloc_ewram(int index, unsigned int size);
 
 void Func_80f377c(void)
 {
@@ -64,7 +79,7 @@ void Func_80f377c(void)
     DMA3_CLEAR(p, 0x3004);
     DMA3_COPY(PALETTE_BG, (void*)&p->startPal.palBG, sizeof(p->startPal.palBG));
     DMA3_COPY(PALETTE_OBJ, (void*)&p->startPal.palOBJ, sizeof(p->startPal.palOBJ));
-    Func_80f3078(0x10000, &p->startPal, &p->targetPlanes, PALFADE_ALL);
+    Func_80f3078(0x10000, &p->startPal, &p->targetBGR, PALFADE_ALL);
     StartTask(Func_80f2f10, 0xc80);
 }
 
@@ -75,16 +90,10 @@ void Func_80f37ec(void) {
     gfree(0x20);
 }
 
-extern unsigned char iwram_3001ed0[];
-
-static inline PaletteFadeState* GetPaletteFadeState(void) {
-	return *(PaletteFadeState**)&iwram_3001ed0;
-}
-
 void Func_80f3804(int arg0, PalFadeType arg1) {
     PaletteFadeState *p = GetPaletteFadeState();
     if (p != NULL) {
-        Func_80f3078(arg0, &p->startPal, &p->targetPlanes, arg1);
+        Func_80f3078(arg0, &p->startPal, &p->targetBGR, arg1);
     }
 }
 
@@ -92,7 +101,7 @@ void Func_80f3804(int arg0, PalFadeType arg1) {
 void Func_80f3824(unsigned int arg0, PalFadeType arg1) {
     PaletteFadeState *p = GetPaletteFadeState();
     if (p != NULL) {
-        Func_80f3078(arg0, &p->startPal, &p->curPlanes, arg1);
+        Func_80f3078(arg0, &p->startPal, &p->currentBGR, arg1);
     }
 }
 
@@ -114,7 +123,7 @@ void Func_80f3858(unsigned int frames)
     if (p != NULL) {
         p->rampFrames = frames;
         p->rampPos = 0;
-        Func_80f2ebc(&p->curPlanes, &p->targetPlanes, &p->rampDelta, frames);
+        Func_80f2ebc(&p->currentBGR, &p->targetBGR, &p->rampDelta, frames);
     }
 }
 

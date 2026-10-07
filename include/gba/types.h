@@ -68,5 +68,6 @@ typedef union {
 #define PALETTE_BG *(palette256_t*)0x05000000
 #define PALETTE_OBJ *(palette256_t*)0x05000200
 #define PALETTE_SIZE 0x200
+#define PALETTE_COUNT (PALETTE_SIZE / sizeof(color_t))
 
 #endif // _GBA_TYPES_H_
