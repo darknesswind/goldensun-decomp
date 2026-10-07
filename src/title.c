@@ -51,7 +51,7 @@ typedef struct {
     PaletteBGRData rampDelta;
     PaletteData paletteBuf[2];
     u8 paletteIdx;
-    char rampFrames;
+    signed char rampFrames;
     u8 rampPos;
     u8 pad_3003;
 } PaletteFadeState;
@@ -61,9 +61,57 @@ extern unsigned char iwram_3001ed0[];
 static inline PaletteFadeState* GetPaletteFadeState(void) {
     return *(PaletteFadeState**)&iwram_3001ed0;
 }
-
+#if 1
 INCLUDE_ASM("asm/title/Func_80f2f10.s");
 extern void Func_80f2f10(void);
+#else
+/* Parked candidate, see src/non_matching/title/Func_80f2f10.c for notes. */
+void Func_80f2f10(void)
+{
+    PaletteFadeState *p = GetPaletteFadeState();
+    u16 *delta;
+    s32 nextPos;
+    u16 *cur;
+    s32 i;
+
+    delta = (u16 *)&p->rampDelta;
+    if (p->rampFrames == 0)
+        return;
+
+    nextPos = p->rampPos + 1;
+    p->rampPos = nextPos;
+    if ((signed char)nextPos < p->rampFrames) {
+        cur = (u16 *)&p->currentBGR;
+        for (i = 0; i < (s32)(sizeof(PaletteBGRData) / sizeof(u16)); ++i)
+            *cur++ += *delta++;
+    } else {
+        DMA3_COPY(&p->targetBGR, &p->currentBGR, sizeof(p->currentBGR));
+        p->rampFrames = 0;
+    }
+
+    {
+        u16 *src;
+        u16 *dst;
+
+        dst = (u16 *)&p->paletteBuf[p->paletteIdx ^ 1];
+        src = (u16 *)&p->currentBGR;
+        i = sizeof(PaletteBGRData) / sizeof(u16) / 3;
+
+        do {
+            *dst++ = (src[0] & 0x7C00) | (((src[1] << 16) >> 21) & 0x3E0)
+                   | (((src[2] << 16) >> 26) & 0x1F);
+            src += 3;
+        } while (--i != 0);
+    }
+
+    p->paletteIdx ^= 1;
+    {
+        u8 *buf = (u8 *)p + (p->paletteIdx << 10);
+        ScheduleDmaTransfer(PALETTE_BG, buf + 0x2800, MAKE_DMATASK_DMA(0x8400, 0x80));
+        ScheduleDmaTransfer(PALETTE_OBJ, buf + 0x2a00, MAKE_DMATASK_DMA(0x8400, 0x80));
+    }
+}
+#endif
 
 INCLUDE_ASM("asm/title/Func_80f3078.s");
 extern void Func_80f3078(unsigned int, void*, void* target, int);
